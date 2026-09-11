@@ -421,13 +421,13 @@ namespace Storage {
 		}
 
 		SKSE::log::info("LoadCallback: restored {} NPC entries from cosave", s_npcData.size());
-		Actors::ApplyNPCOverrides();
-		SKSE::log::info("LoadCallback: NPC overrides re-applied ({} entries)", g_npcOverrides.size());
 	}
 
 	void RevertCallback(SKSE::SerializationInterface*) {
+
 		SKSE::log::info("Reverting Storage: clearing {} entries", s_npcData.size());
 		s_npcData.clear();
+		Actors::ApplyNPCOverrides();
 	}
 
 	//====================================Papyrus================================================================
