@@ -3,15 +3,14 @@
 //Scale bones
 static void SetNodeScaleImpl(RE::NiAVObject* a_root, const char* a_nodeName, float a_scale) {
 
-	auto node = a_root->GetObjectByName(a_nodeName);
-	if (node)
+	if (auto node = a_root->GetObjectByName(a_nodeName))
 		node->local.scale = a_scale;
 }
 
 //Function to make the penis look good
-inline static float Rescale(float scale, float factor) {
+inline static float Rescale(float a_scale, float a_factor) {
 
-	return 1.0f + (scale - 1.0f) * factor;
+	return 1.0f + (a_scale - 1.0f) * a_factor;
 }
 
 static uint8_t GenerateGaussianRank(int target, std::mt19937& rng) {
@@ -36,40 +35,38 @@ static std::uint8_t GenerateRandomRank(int a_targetSize) {
 namespace SchlongLogic {
 
 	void ScaleSchlongBones(RE::Actor* a_actor) {
-
-		if (!a_actor)
+		if (!a_actor || !a_actor->Is3DLoaded())
 			return;
 
-		auto* root = a_actor->Get3D();
-		if (!root)
-			return;
+		RE::FormID actorID = a_actor->GetFormID();
 
-		auto* base = a_actor->GetActorBase();
-		if (!base)
-			return;
+		SKSE::GetTaskInterface()->AddTask([actorID]() {
+			auto* actor = RE::TESForm::LookupByID<RE::Actor>(actorID);
+			if (!actor || !actor->Is3DLoaded())
+				return;
 
-		auto* npcData = Storage::GetNPCData(base->GetFormID());
-		if (!npcData)
-			return;
+			auto* root = actor->Get3D();
+			if (!root)
+				return;
 
-		const auto* addonData = Storage::GetAddonBoneData(npcData->addonName);
-		if (!addonData)
-			return;
+			auto* base = actor->GetActorBase();
+			if (!base)
+				return;
 
-		float size = static_cast<float>(npcData->rank) / 20.0f;
-		float boost = 1.0f;
+			auto* npcData = Storage::GetNPCData(base->GetFormID());
+			const auto* addonData = npcData ? Storage::GetAddonBoneData(npcData->addonName) : nullptr;
 
-		for (std::size_t i = 0; i < 8; ++i) {
+			float sizeFactor = npcData ? (static_cast<float>(npcData->rank) / 20.0f) : 1.0f;
 
-			float scale = addonData->bones[i];
+			for (std::size_t i = 0; i < sNiNodes.size(); ++i) {
+				float targetScale = 1.0f;
 
-			if (i == 0 && scale > 1.0f)
-				scale = Rescale(scale, boost);
+				if (addonData)
+					targetScale = Rescale(addonData->bones[i], sizeFactor);
 
-			scale = Rescale(scale, size);
-
-			SetNodeScaleImpl(root, sNiNodes[i], scale);
-		}
+				SetNodeScaleImpl(root, sNiNodes[i], targetScale);
+			}
+			});
 	}
 
 	static void GetCompatibleCandidates(RE::TESNPC* a_base, std::vector<AddonCandidate>& outCandidates) {
@@ -132,7 +129,7 @@ namespace SchlongLogic {
 		auto* armor = RE::TESForm::LookupByEditorID<RE::TESObjectARMO>(editorID);
 
 		if (!armor) {
-			SKSE::log::warn("SOS: Addon '{}' missing for Base {:08X}. Cleared.", data->addonName, a_baseID);
+			SKSE::log::warn("SOS: Addon armor form '{}' ({}) not found for NPC Base FormID {:08X}. Clearing cached assignment.", data->addonName, editorID, a_baseID);
 			Storage::ClearNPCData(a_baseID);
 			return nullptr;
 		}

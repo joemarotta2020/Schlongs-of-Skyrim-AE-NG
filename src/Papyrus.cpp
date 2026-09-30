@@ -115,6 +115,19 @@ namespace Papyrus {
 		return std::format("0x{:08X}", race->GetFormID());
 	}
 
+	//I Added this because I needed something to remove the underwear on some mods I make that replace all outfits
+	static void RemoveNonAddonFromSlot52(RE::StaticFunctionTag*, RE::Actor* a_actor) {
+
+		if (!a_actor)
+			return;
+
+		auto* armor = a_actor->GetWornArmor(RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary);
+		if (armor && !Util::ArmorHasKeyword(armor, GenKW)) {
+			if (auto* equipManager = RE::ActorEquipManager::GetSingleton())
+				equipManager->UnequipObject(a_actor, armor);
+		}
+	}
+
 	bool RegisterFunctions(RE::BSScript::IVirtualMachine* a_vm) {
 
 		if (!a_vm)
@@ -126,6 +139,8 @@ namespace Papyrus {
 		a_vm->RegisterFunction("ExecuteErectionCycle", SosPapyrusScript, ExecuteErectionCycle);
 		a_vm->RegisterFunction("PrepareForShutdown", SosPapyrusScript, PrepareForShutdown);
 		a_vm->RegisterFunction("GetActorRaceEditorID", SosPapyrusScript, GetActorRaceEditorID);
+
+		a_vm->RegisterFunction("RemoveNonAddonFromSlot52", SosPapyrusScript, RemoveNonAddonFromSlot52);
 
 		return true;
 	}

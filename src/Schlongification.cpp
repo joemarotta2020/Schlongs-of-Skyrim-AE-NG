@@ -60,7 +60,7 @@ namespace SOS {
 	}
 
 	//Handles equip/unequip of armor with the Underwear keyword.
-//It hides or restores the Addon without ever touching Slot52 itself.
+	//It hides or restores the Addon without ever touching Slot52 itself.
 	static void HandleUnderwearChange(RE::Actor* a_actor, bool is_equipping) {
 
 		if (!a_actor)
