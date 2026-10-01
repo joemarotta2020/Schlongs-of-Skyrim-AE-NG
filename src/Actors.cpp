@@ -133,9 +133,8 @@ namespace Actors {
 		const std::filesystem::path path = NPCPath;
 		std::filesystem::create_directories(path.parent_path());
 		std::ofstream file(path);
-		if (file.is_open()) {
+		if (file.is_open())
 			file << j.dump(4);
-		}
 	}
 
 	void LoadNPCOverrides() {
@@ -288,9 +287,8 @@ namespace Actors {
 		else {
 			a_actor->AddToFaction(g_schlongifiedFaction, -1);
 
-			if (g_SexLabGenderFaction && Util::IsFemale(base)) {
+			if (g_SexLabGenderFaction && Util::IsFemale(base))
 				a_actor->AddToFaction(g_SexLabGenderFaction, 1);
-			}
 		}
 
 		Util::RemoveSOSItemsFromInventory(a_actor);

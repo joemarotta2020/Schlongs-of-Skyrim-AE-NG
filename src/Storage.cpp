@@ -554,7 +554,7 @@ namespace Storage {
 			for (auto& [raceName, raceData] : addonData.compatibleRaces)
 				raceData.Rank = rank;
 
-		SKSE::log::info("SOS: Global Rank set to {} for all loaded addons via MCM.", rank);
+		SKSE::log::debug("SOS: Global Rank set to {} for all loaded addons via MCM.", rank);
 	}
 
 	static void SetGlobalChance(RE::StaticFunctionTag*, int a_chance) {
@@ -565,7 +565,7 @@ namespace Storage {
 			for (auto& [raceName, raceData] : addonData.compatibleRaces)
 				raceData.Chance = chance;
 
-		SKSE::log::info("SOS: Global Chance set to {}% for all loaded addons via MCM.", chance);
+		SKSE::log::debug("SOS: Global Chance set to {}% for all loaded addons via MCM.", chance);
 	}
 
 	static void SetAddonRankForAll(RE::StaticFunctionTag*, RE::BSFixedString a_addon, int a_rank) {

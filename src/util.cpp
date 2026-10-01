@@ -313,7 +313,7 @@ namespace Util {
 			ini.SetLongValue("JSON", "Rank", a_rank);
 			ini.SetLongValue("JSON", "Chance", a_chance);
 			ini.SaveFile(INIPath);
-			SKSE::log::info("SOS: Global defaults updated via MCM (Enabled: {}, Rank: {}, Chance: {}).", a_enabled, a_rank, a_chance);
+			SKSE::log::debug("SOS: Global defaults updated via MCM (Enabled: {}, Rank: {}, Chance: {}).", a_enabled, a_rank, a_chance);
 		}
 	}
 
@@ -333,7 +333,7 @@ namespace Util {
 
 			ini.SetBoolValue("JSON", "SexLabForceMaleOnSchlong", a_value);
 			ini.SaveFile(INIPath);
-			SKSE::log::info("SOS: SexLab Force Male On Schlong set to {} via MCM.", a_value);
+			SKSE::log::debug("SOS: SexLab Force Male On Schlong set to {} via MCM.", a_value);
 		}
 	}
 

@@ -72,6 +72,7 @@ static RE::TESObjectARMO* ResolveArmorKey(const std::string& a_key) {
 
 	return armor;
 }
+
 static inline std::string MakeArmorKey(const RE::TESObjectARMO* a_armor) {
 
 	if (!a_armor)
@@ -88,6 +89,7 @@ static inline std::string MakeArmorKey(const RE::TESObjectARMO* a_armor) {
 
 	return std::format("{}|{}", file->GetFilename(), editorID);
 }
+
 static void SaveArmorOverrides() {
 
 	nlohmann::json j;
@@ -166,9 +168,8 @@ namespace Armors {
 
 		std::uint32_t count = 0;
 		for (auto* armor : dataHandler->GetFormArray<RE::TESObjectARMO>()) {
-			if (ModifyArmorWithSOS(armor, blacklist)) {
+			if (ModifyArmorWithSOS(armor, blacklist))
 				count++;
-			}
 		}
 
 		g_processed = true;

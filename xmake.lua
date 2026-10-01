@@ -1,5 +1,5 @@
 set_project("SchlongsOfSkyrim")
-set_version("3.0.3")
+set_version("3.1.0")
 
 set_languages("c++23")
 set_arch("x64")

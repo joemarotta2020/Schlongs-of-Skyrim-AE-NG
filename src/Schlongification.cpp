@@ -197,9 +197,8 @@ namespace SOS {
 		auto* refr = a_event->objectInitialized.get();
 		if (refr) {
 			auto* actor = refr->As<RE::Actor>();
-			if (actor) {
+			if (actor)
 				OnActorActivated(actor);
-			}
 		}
 
 		return RE::BSEventNotifyControl::kContinue;

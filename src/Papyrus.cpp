@@ -81,7 +81,7 @@ namespace Papyrus {
 		if (!a_actor || !a_actor->Is3DLoaded())
 			return;
 
-		if (a_value < 0)
+		if (a_value <= 0)
 			a_actor->NotifyAnimationGraph("SOSFlaccid");
 		else {
 
@@ -116,15 +116,25 @@ namespace Papyrus {
 	}
 
 	//I Added this because I needed something to remove the underwear on some mods I make that replace all outfits
-	static void RemoveNonAddonFromSlot52(RE::StaticFunctionTag*, RE::Actor* a_actor) {
+	static void ShowSchlong(RE::StaticFunctionTag*, RE::Actor* a_actor) {
 
 		if (!a_actor)
 			return;
 
-		auto* armor = a_actor->GetWornArmor(RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary);
-		if (armor && !Util::ArmorHasKeyword(armor, GenKW)) {
-			if (auto* equipManager = RE::ActorEquipManager::GetSingleton())
-				equipManager->UnequipObject(a_actor, armor);
+		auto* equipManager = RE::ActorEquipManager::GetSingleton();
+		if (!equipManager)
+			return;
+
+		auto* slot52Armor = a_actor->GetWornArmor(RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary);
+		if (slot52Armor && !Util::ArmorHasKeyword(slot52Armor, GenKW))
+			equipManager->UnequipObject(a_actor, slot52Armor);
+
+		for (const auto& [item, data] : a_actor->GetInventory()) {
+			const auto& [count, entry] = data;
+			if (entry && entry->IsWorn())
+				if (auto* armor = item->As<RE::TESObjectARMO>())
+					if (Util::ArmorHasKeyword(armor, UndwKW))
+						equipManager->UnequipObject(a_actor, armor);
 		}
 	}
 
@@ -140,7 +150,7 @@ namespace Papyrus {
 		a_vm->RegisterFunction("PrepareForShutdown", SosPapyrusScript, PrepareForShutdown);
 		a_vm->RegisterFunction("GetActorRaceEditorID", SosPapyrusScript, GetActorRaceEditorID);
 
-		a_vm->RegisterFunction("RemoveNonAddonFromSlot52", SosPapyrusScript, RemoveNonAddonFromSlot52);
+		a_vm->RegisterFunction("ShowSchlong", SosPapyrusScript, ShowSchlong);
 
 		return true;
 	}
