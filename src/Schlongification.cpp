@@ -1,4 +1,5 @@
 #include "Schlongification.h"
+#include "JM_DRITCompat.h"
 
 namespace SOS {
 
@@ -122,8 +123,15 @@ namespace SOS {
 		if (!biped)
 			return;
 
-		//Underwear doesn't touch Slot52, so it's handled in its own separate branch
+		// Underwear never wins on a corpse. Delayed outfit refreshes are the source
+		// of the late-underwear regression; intercept them at SOS's native equip event
+		// and remove/reassert immediately. Living actors keep normal SOS behavior.
 		if (Util::ArmorHasKeyword(armor, UndwKW)) {
+			if (a_actor->IsDead() && is_equipping) {
+				JMDRITCompat::EnsureCorpseSchlong(a_actor, true);
+				return;
+			}
+
 			HandleUnderwearChange(a_actor, is_equipping);
 			return;
 		}
