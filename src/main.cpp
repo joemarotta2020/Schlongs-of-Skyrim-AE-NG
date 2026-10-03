@@ -5,6 +5,7 @@
 #include "Armors.h"
 #include "Papyrus.h"
 #include "Actors.h"
+#include "JM_DRITCompat.h"
 
 //log function, changing things here don't break the mod
 static void SetupSimpleLog() {
@@ -68,6 +69,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
 			SKSE::GetPapyrusInterface()->Register(Storage::RegisterFunctions);
 			SKSE::GetPapyrusInterface()->Register(Util::RegisterFunctions);
 			SKSE::GetPapyrusInterface()->Register(Actors::RegisterFunctions);
+			SKSE::GetPapyrusInterface()->Register(JMDRITCompat::RegisterFunctions);
 
 			//Check dependencie
 			Util::CheckDependencies();
