@@ -1,0 +1,59 @@
+name: Check upstream SOS updates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 10 * * 0'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout JM main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/SpongeBobHentaiSimulator/Schlongs-of-Skyrim-AE-NG.git
+          git fetch upstream main
+
+      - name: Detect upstream changes
+        id: check
+        shell: bash
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge upstream into review branch
+        if: steps.check.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B jm/upstream-sync origin/main
+          git merge --no-edit upstream/main
+          git push --force-with-lease origin jm/upstream-sync
+
+      - name: Open or update upstream sync PR
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          existing=$(gh pr list --head jm/upstream-sync --base main --state open --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh pr create               --base main               --head jm/upstream-sync               --title "JM: sync latest upstream SOS AE-NG"               --body "Automated upstream sync candidate. Do not merge until the JM DRIT compatibility hooks and the DLL build workflow pass review."
+          else
+            echo "Upstream sync PR #$existing already open and branch has been refreshed."
+          fi
