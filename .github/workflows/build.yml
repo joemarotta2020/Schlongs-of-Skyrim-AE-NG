@@ -1,0 +1,93 @@
+name: Build JM SOS AE-NG
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows x64 DLL
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout patched SOS
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up MSVC x64
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+
+      - name: Fetch pinned CommonLibSSE-NG
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path extern | Out-Null
+          git clone https://github.com/alandtse/CommonLibSSE-NG.git extern/CommonLibSSE-NG
+          git -C extern/CommonLibSSE-NG checkout 39f9d07a6ffabea8fb559eee87ab7d27cd463e8a
+          git -C extern/CommonLibSSE-NG submodule update --init --recursive
+
+      - name: Configure release
+        shell: pwsh
+        run: |
+          xmake f -p windows -a x64 -m release -y
+
+      - name: Build DLL
+        shell: pwsh
+        run: |
+          xmake build -vD -y SchlongsOfSkyrim
+
+      - name: Locate and verify DLL
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dll = Get-ChildItem -Path build -Recurse -File -Filter 'SchlongsOfSkyrim.dll' | Select-Object -First 1
+          if (-not $dll) { throw 'SchlongsOfSkyrim.dll was not produced.' }
+          Write-Host "DLL: $($dll.FullName)"
+          $exports = (& dumpbin /nologo /exports $dll.FullName) -join "`n"
+          $exports | Write-Host
+          if ($exports -notmatch 'SKSEPlugin_Load') {
+            throw 'Missing required SKSEPlugin_Load export.'
+          }
+
+      - name: Stage deployable artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path artifact/SKSE/Plugins | Out-Null
+          New-Item -ItemType Directory -Force -Path artifact/Source/Scripts | Out-Null
+
+          $dll = Get-ChildItem -Path build -Recurse -File -Filter 'SchlongsOfSkyrim.dll' | Select-Object -First 1
+          Copy-Item $dll.FullName artifact/SKSE/Plugins/SchlongsOfSkyrim.dll
+
+          $pdb = Get-ChildItem -Path build -Recurse -File -Filter 'SchlongsOfSkyrim.pdb' | Select-Object -First 1
+          if ($pdb) { Copy-Item $pdb.FullName artifact/SKSE/Plugins/SchlongsOfSkyrim.pdb }
+
+          Copy-Item papyrus/JM_SOS_DRIT_API.psc artifact/Source/Scripts/JM_SOS_DRIT_API.psc
+
+          "SOS fork commit: $env:GITHUB_SHA" | Set-Content artifact/BUILD_INFO.txt
+          "CommonLibSSE-NG: 39f9d07a6ffabea8fb559eee87ab7d27cd463e8a (10.1.0)" | Add-Content artifact/BUILD_INFO.txt
+          "JM patch: DRIT corpse presentation + late SOS underwear rejection" | Add-Content artifact/BUILD_INFO.txt
+
+          Get-ChildItem artifact -Recurse
+
+      - name: Upload DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JM-SOS-AE-NG-DLL
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
