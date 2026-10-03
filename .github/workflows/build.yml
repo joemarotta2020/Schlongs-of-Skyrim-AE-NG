@@ -40,6 +40,13 @@ jobs:
           git -C extern/CommonLibSSE-NG checkout 39f9d07a6ffabea8fb559eee87ab7d27cd463e8a
           git -C extern/CommonLibSSE-NG submodule update --init --recursive
 
+          # CommonLib 10.1.0 auto-downloads a release-tag prebuilt when GITHUB_ACTIONS
+          # is set. That archive can be built with a different MSVC STL than the
+          # current runner. Make the checkout intentionally dirty (comment only) so
+          # CommonLib takes its documented source-build fallback and uses this exact
+          # MSVC toolchain for both the library and SOS.
+          Add-Content extern/CommonLibSSE-NG/xmake.lua "`n-- JM CI: force same-toolchain source build"
+
       - name: Configure release
         shell: pwsh
         run: |
