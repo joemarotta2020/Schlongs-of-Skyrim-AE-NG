@@ -193,15 +193,15 @@ namespace {
 		bool refreshQueued = false;
 
 		// EquipObject can update inventory/equipment state before the corpse's existing
-		// NiNode has attached the ArmorAddon. Force one corpse-only 3D rebuild so the
+		// NiNode has attached the ArmorAddon. Force one corpse-only 3D reset so the
 		// rendered state catches up with the authoritative SOS assignment.
 		if (loaded3D) {
-			a_actor->QueueNiNodeUpdate(false);
+			a_actor->DoReset3D(false);
 			refreshQueued = true;
 		}
 
 		SKSE::log::info(
-			"JM DRIT: corpse enforce actor='{}' ({:08X}) addon='{}' ({:08X}) worn={} 3D={} refreshQueued={}",
+			"JM DRIT: corpse enforce actor='{}' ({:08X}) addon='{}' ({:08X}) worn={} 3D={} reset3D={}",
 			a_actor->GetName(),
 			a_actor->GetFormID(),
 			a_schlong->GetName(),
