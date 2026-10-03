@@ -181,6 +181,36 @@ namespace {
 		return selected.armor;
 	}
 
+	void RefreshCorpse3D(RE::Actor* a_actor, RE::TESObjectARMO* a_schlong)
+	{
+		if (!a_actor || !a_schlong)
+			return;
+
+		const auto slot = RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary;
+		auto* wornSlot52 = a_actor->GetWornArmor(slot);
+		const bool wornExpected = wornSlot52 == a_schlong;
+		const bool loaded3D = a_actor->Is3DLoaded();
+		bool refreshQueued = false;
+
+		// EquipObject can update inventory/equipment state before the corpse's existing
+		// NiNode has attached the ArmorAddon. Force one corpse-only 3D rebuild so the
+		// rendered state catches up with the authoritative SOS assignment.
+		if (loaded3D) {
+			a_actor->QueueNiNodeUpdate(false);
+			refreshQueued = true;
+		}
+
+		SKSE::log::info(
+			"JM DRIT: corpse enforce actor='{}' ({:08X}) addon='{}' ({:08X}) worn={} 3D={} refreshQueued={}",
+			a_actor->GetName(),
+			a_actor->GetFormID(),
+			a_schlong->GetName(),
+			a_schlong->GetFormID(),
+			wornExpected,
+			loaded3D,
+			refreshQueued);
+	}
+
 	void ApplySOSFactions(RE::Actor* a_actor, RE::TESNPC* a_base)
 	{
 		if (!a_actor || !a_base)
@@ -259,6 +289,7 @@ namespace {
 			true,   // immediate
 			true);  // applyNow
 
+		RefreshCorpse3D(a_actor, schlong);
 		SchlongLogic::ScaleSchlongBones(a_actor);
 		return true;
 	}
