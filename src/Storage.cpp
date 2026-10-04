@@ -333,6 +333,16 @@ namespace Storage {
 		return s_explicitNoneOverrides.contains(a_baseID);
 	}
 
+	bool IsNoneAddonName(const RE::BSFixedString& a_addonName) {
+
+		std::string value = a_addonName.c_str();
+		value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+		value.erase(std::find_if(value.rbegin(), value.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), value.end());
+		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+		return value.empty() || value == "none" || value == "<none>" || value == "null";
+	}
+
 	void SetExplicitNoneOverride(RE::FormID a_baseID, bool a_explicitNone) {
 
 		if (a_explicitNone)
@@ -450,7 +460,7 @@ namespace Storage {
 		// Preserve only intentional NONE: SOS_NoneDefault or an explicit MCM/JSON NONE.
 		std::uint32_t staleNoneCleared = 0;
 		for (auto it = s_npcData.begin(); it != s_npcData.end();) {
-			if (!it->second.addonName.empty() || HasExplicitNoneOverride(it->first)) {
+			if (!IsNoneAddonName(it->second.addonName) || HasExplicitNoneOverride(it->first)) {
 				++it;
 				continue;
 			}
@@ -466,7 +476,7 @@ namespace Storage {
 		}
 
 		SKSE::log::info(
-			"LoadCallback: restored {} NPC entries from cosave; explicit overrides reapplied; cleared {} stale NONE entries",
+			"LoadCallback: restored {} NPC entries from cosave; explicit overrides reapplied; cleared {} stale NONE-like entries",
 			s_npcData.size(),
 			staleNoneCleared);
 	}
