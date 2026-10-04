@@ -116,20 +116,34 @@ namespace SchlongLogic {
 		}
 	}
 
+	static RE::TESObjectARMO* ResolveAddonArmor(const RE::BSFixedString& a_addonName) {
+
+		if (a_addonName.empty())
+			return nullptr;
+
+		std::string editorID = "SOS_Addon_";
+		editorID += a_addonName.c_str();
+		editorID += "_Genitals";
+		return RE::TESForm::LookupByEditorID<RE::TESObjectARMO>(editorID);
+	}
+
+	static bool IsRealGenitalAddon(RE::TESObjectARMO* a_armor) {
+
+		return a_armor &&
+			Util::ArmorHasKeyword(a_armor, GenKW) &&
+			!Util::ArmorHasKeyword(a_armor, PubKW);
+	}
+
 	RE::TESObjectARMO* ResolveCachedAddon(RE::FormID a_baseID) {
 
 		auto* data = Storage::GetNPCData(a_baseID);
 		if (!data || data->addonName.empty())
 			return nullptr;
 
-		std::string editorID = "SOS_Addon_";
-		editorID += data->addonName.c_str();
-		editorID += "_Genitals";
+		auto* armor = ResolveAddonArmor(data->addonName);
 
-		auto* armor = RE::TESForm::LookupByEditorID<RE::TESObjectARMO>(editorID);
-
-		if (!armor) {
-			SKSE::log::warn("SOS: Addon armor form '{}' ({}) not found for NPC Base FormID {:08X}. Clearing cached assignment.", data->addonName, editorID, a_baseID);
+		if (!IsRealGenitalAddon(armor)) {
+			SKSE::log::warn("SOS: Cached addon '{}' is missing or not a real genital addon for NPC Base FormID {:08X}. Clearing cached assignment.", data->addonName, a_baseID);
 			Storage::ClearNPCData(a_baseID);
 			return nullptr;
 		}
@@ -146,11 +160,42 @@ namespace SchlongLogic {
 		if (!npcBase)
 			return nullptr;
 
-		RE::FormID baseID = npcBase->GetFormID();
+		const RE::FormID baseID = npcBase->GetFormID();
+		bool migratedStaleNone = false;
 
-		if (Storage::HasNPCData(baseID))
-			return ResolveCachedAddon(baseID);
+		// A cached non-NONE assignment is authoritative if its addon still resolves.
+		// Historically, SOS also serialized random NONE as an empty addon name.  That
+		// made old NONE results permanent even after probabilities/configuration were
+		// changed.  Preserve only deliberate NONE states: the SOS_NoneDefault keyword
+		// or an explicit per-NPC MCM/JSON NONE override.
+		if (Storage::HasNPCData(baseID)) {
+			auto* cached = Storage::GetNPCData(baseID);
 
+			if (cached && cached->addonName.empty()) {
+				if (npcBase->HasKeywordString(NPCKW) || Storage::HasExplicitNoneOverride(baseID))
+					return nullptr;
+
+				SKSE::log::info(
+					"SOS: migrating stale cached NONE for actor '{}' base {:08X}; rerolling from current compatible addons",
+					a_actor->GetName(),
+					baseID);
+				Storage::ClearNPCData(baseID);
+				migratedStaleNone = true;
+			}
+			else {
+				if (auto* cachedArmor = ResolveCachedAddon(baseID))
+					return cachedArmor;
+
+				// ResolveCachedAddon clears missing/invalid cached addon data.  Fall through
+				// and rebuild the assignment from the current configuration immediately.
+				SKSE::log::info(
+					"SOS: rebuilding invalid cached addon for actor '{}' base {:08X}",
+					a_actor->GetName(),
+					baseID);
+			}
+		}
+
+		// SOS_NoneDefault remains an intentional hard opt-out.
 		if (npcBase->HasKeywordString(NPCKW)) {
 			Storage::SetNPCAddonData(baseID, "", 1);
 			return nullptr;
@@ -162,41 +207,76 @@ namespace SchlongLogic {
 		if (candidates.empty())
 			return nullptr;
 
-		int totalWeight = 0;
-		for (const auto& c : candidates)
-			totalWeight += c.probability;
+		struct ResolvedCandidate {
+			AddonCandidate candidate;
+			RE::TESObjectARMO* armor{ nullptr };
+		};
 
-		int ceiling = std::max(100, totalWeight);
+		std::vector<ResolvedCandidate> resolved;
+		resolved.reserve(candidates.size());
+		std::uint32_t totalWeight = 0;
 
-		if (!Util::IsFemale(npcBase))
-			ceiling = totalWeight;
+		for (const auto& candidate : candidates) {
+			auto* armor = ResolveAddonArmor(candidate.name);
+			if (!IsRealGenitalAddon(armor)) {
+				SKSE::log::warn(
+					"SOS: skipping enabled addon '{}' for actor '{}' because its genital armor is missing/invalid",
+					candidate.name,
+					a_actor->GetName());
+				continue;
+			}
 
-		std::uniform_int_distribution<int> dist(1, ceiling);
+			resolved.push_back({ candidate, armor });
+			totalWeight += candidate.probability;
+		}
 
-		int roll = dist(g_rng);
-		//SKSE::log::debug("Total Probability: {} for {}", roll, a_actor->GetName());
-		if (roll > totalWeight) {
-			Storage::SetNPCAddonData(baseID, "", 1);
+		if (resolved.empty()) {
+			SKSE::log::warn(
+				"SOS: no valid compatible genital addons remain for actor '{}' base {:08X}",
+				a_actor->GetName(),
+				baseID);
 			return nullptr;
 		}
 
-		int accum = 0;
-		for (const auto& c : candidates) {
-			accum += c.probability;
+		std::size_t selectedIndex = 0;
 
-			if (roll <= accum) {
+		// NON-NONE invariant: once at least one enabled, race-compatible genital addon
+		// exists, Chance values are weights between those addons.  NONE is not part of
+		// the random draw.  This makes 100+100 exactly 50/50 and also prevents an
+		// accidental NONE gap when enabled weights total less than 100.
+		if (totalWeight > 0) {
+			std::uniform_int_distribution<std::uint32_t> dist(1, totalWeight);
+			const auto roll = dist(g_rng);
+			std::uint32_t accum = 0;
 
-				std::uint8_t generatedRank = GenerateRandomRank(c.targetRank);
-				Storage::SetNPCAddonData(baseID, c.name, generatedRank);
-
-				std::string editorID = "SOS_Addon_";
-				editorID += c.name.c_str();
-				editorID += "_Genitals";
-
-				return RE::TESForm::LookupByEditorID<RE::TESObjectARMO>(editorID);
+			for (std::size_t i = 0; i < resolved.size(); ++i) {
+				accum += resolved[i].candidate.probability;
+				if (roll <= accum) {
+					selectedIndex = i;
+					break;
+				}
 			}
 		}
-		return nullptr;
+		else {
+			// If every enabled compatible addon is configured at zero, still honor the
+			// non-NONE invariant by choosing uniformly rather than manufacturing NONE.
+			std::uniform_int_distribution<std::size_t> dist(0, resolved.size() - 1);
+			selectedIndex = dist(g_rng);
+		}
+
+		const auto& selected = resolved[selectedIndex];
+		const std::uint8_t generatedRank = GenerateRandomRank(selected.candidate.targetRank);
+		Storage::SetNPCAddonData(baseID, selected.candidate.name, generatedRank);
+
+		if (migratedStaleNone) {
+			SKSE::log::info(
+				"SOS: stale NONE repaired for actor '{}' base {:08X} -> addon '{}'",
+				a_actor->GetName(),
+				baseID,
+				selected.candidate.name);
+		}
+
+		return selected.armor;
 	}
 
 	static void ScaleSchlongBonesAE(RE::StaticFunctionTag*, RE::Actor* a_actor, float) {
