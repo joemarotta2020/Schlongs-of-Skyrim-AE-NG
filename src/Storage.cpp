@@ -444,7 +444,31 @@ namespace Storage {
 		// while a manual non-NONE override cannot be replaced by stale cached data.
 		Actors::ApplyNPCOverrides();
 
-		SKSE::log::info("LoadCallback: restored {} NPC entries from cosave; explicit overrides reapplied", s_npcData.size());
+		// One-time/self-healing migration: old SOS versions serialized random NONE as
+		// an empty addon name.  Remove those stale cache entries at load so every NPC
+		// gets a fresh assignment from the current configuration when next processed.
+		// Preserve only intentional NONE: SOS_NoneDefault or an explicit MCM/JSON NONE.
+		std::uint32_t staleNoneCleared = 0;
+		for (auto it = s_npcData.begin(); it != s_npcData.end();) {
+			if (!it->second.addonName.empty() || HasExplicitNoneOverride(it->first)) {
+				++it;
+				continue;
+			}
+
+			auto* npcBase = RE::TESForm::LookupByID<RE::TESNPC>(it->first);
+			if (npcBase && npcBase->HasKeywordString(NPCKW)) {
+				++it;
+				continue;
+			}
+
+			it = s_npcData.erase(it);
+			++staleNoneCleared;
+		}
+
+		SKSE::log::info(
+			"LoadCallback: restored {} NPC entries from cosave; explicit overrides reapplied; cleared {} stale NONE entries",
+			s_npcData.size(),
+			staleNoneCleared);
 	}
 
 	void RevertCallback(SKSE::SerializationInterface*) {
