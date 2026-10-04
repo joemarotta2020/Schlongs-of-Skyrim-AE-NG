@@ -77,6 +77,7 @@ namespace Storage {
 	const GenderGroups& GetGenderGroups();
 	void ClearNPCData(RE::FormID a_baseID);
 	bool HasExplicitNoneOverride(RE::FormID a_baseID);
+	bool IsNoneAddonName(const RE::BSFixedString& a_addonName);
 	void SetExplicitNoneOverride(RE::FormID a_baseID, bool a_explicitNone);
 	void ClearExplicitNoneOverrides();
 	void LoadAddonBoneData();
