@@ -46,7 +46,7 @@ namespace SOS {
 
 		auto* schlong = SchlongLogic::DetermineWinningAddon(a_actor);
 		UpdateAssignmentFactions(a_actor, base, schlong);
-		if (!IsRealGenitalAddon(schlong))
+		if (!schlong)
 			return false;
 
 		if (wornSlot52 == schlong) {
@@ -133,7 +133,7 @@ namespace SOS {
 
 		auto* schlong = SchlongLogic::DetermineWinningAddon(a_actor);
 		UpdateAssignmentFactions(a_actor, base, schlong);
-		if (!IsRealGenitalAddon(schlong))
+		if (!schlong)
 			return;
 
 		// If the actor is currently concealed, keep the authoritative assignment and
