@@ -209,8 +209,9 @@ namespace Actors {
 			RE::FormID resolvedID = ResolveNPCKey(key);
 
 			if (resolvedID != 0) {
-				Storage::SetExplicitNoneOverride(resolvedID, data.addonName.empty());
-				Storage::SetNPCAddonData(resolvedID, data.addonName, data.rank);
+				const bool explicitNone = Storage::IsNoneAddonName(data.addonName);
+				Storage::SetExplicitNoneOverride(resolvedID, explicitNone);
+				Storage::SetNPCAddonData(resolvedID, explicitNone ? RE::BSFixedString("") : data.addonName, explicitNone ? 1 : data.rank);
 			}
 		}
 	}
@@ -262,7 +263,7 @@ namespace Actors {
 
 		std::uint8_t currentRank = Storage::GetNPCRank(baseID);
 
-		const bool explicitNone = nameStr == "None";
+		const bool explicitNone = Storage::IsNoneAddonName(a_addonName);
 		Storage::SetExplicitNoneOverride(baseID, explicitNone);
 
 		if (explicitNone)
