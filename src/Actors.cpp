@@ -62,7 +62,10 @@ static RE::FormID ResolveNPCKey(const RE::BSFixedString& a_key) {
 		return 0;
 
 	std::string hexID = keyStr.substr(0, separator);
-	std::string pluginName = keyStr.substr(separator + 1);
+	const auto secondSeparator = keyStr.find('|', separator + 1);
+	std::string pluginName = secondSeparator == std::string::npos
+		? keyStr.substr(separator + 1)
+		: keyStr.substr(separator + 1, secondSeparator - separator - 1);
 
 	try {
 		RE::FormID localID = static_cast<RE::FormID>(std::stoul(hexID, nullptr, 16));
@@ -140,6 +143,7 @@ namespace Actors {
 	void LoadNPCOverrides() {
 
 		g_npcOverrides.clear();
+		Storage::ClearExplicitNoneOverrides();
 
 		const std::filesystem::path path = NPCPath;
 		std::ifstream file(path);
@@ -204,8 +208,10 @@ namespace Actors {
 
 			RE::FormID resolvedID = ResolveNPCKey(key);
 
-			if (resolvedID != 0)
+			if (resolvedID != 0) {
+				Storage::SetExplicitNoneOverride(resolvedID, data.addonName.empty());
 				Storage::SetNPCAddonData(resolvedID, data.addonName, data.rank);
+			}
 		}
 	}
 
@@ -256,7 +262,10 @@ namespace Actors {
 
 		std::uint8_t currentRank = Storage::GetNPCRank(baseID);
 
-		if (nameStr == "None")
+		const bool explicitNone = nameStr == "None";
+		Storage::SetExplicitNoneOverride(baseID, explicitNone);
+
+		if (explicitNone)
 			Storage::SetNPCAddonData(baseID, "", 1);
 		else
 			Storage::SetNPCAddonData(baseID, a_addonName, currentRank);
@@ -309,6 +318,7 @@ namespace Actors {
 	static void ClearNPCStorage(RE::StaticFunctionTag*) {
 
 		Storage::s_npcData.clear();
+		Storage::ClearExplicitNoneOverrides();
 		Actors::ApplyNPCOverrides();
 	}
 
