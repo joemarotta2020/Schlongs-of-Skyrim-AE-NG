@@ -127,11 +127,9 @@ namespace SchlongLogic {
 		return RE::TESForm::LookupByEditorID<RE::TESObjectARMO>(editorID);
 	}
 
-	static bool IsRealGenitalAddon(RE::TESObjectARMO* a_armor) {
+	static bool IsResolvableAddonArmor(RE::TESObjectARMO* a_armor) {
 
-		return a_armor &&
-			Util::ArmorHasKeyword(a_armor, GenKW) &&
-			!Util::ArmorHasKeyword(a_armor, PubKW);
+		return a_armor != nullptr;
 	}
 
 	RE::TESObjectARMO* ResolveCachedAddon(RE::FormID a_baseID) {
@@ -142,8 +140,8 @@ namespace SchlongLogic {
 
 		auto* armor = ResolveAddonArmor(data->addonName);
 
-		if (!IsRealGenitalAddon(armor)) {
-			SKSE::log::warn("SOS: Cached addon '{}' is missing or not a real genital addon for NPC Base FormID {:08X}. Clearing cached assignment.", data->addonName, a_baseID);
+		if (!IsResolvableAddonArmor(armor)) {
+			SKSE::log::warn("SOS: Cached addon '{}' cannot be resolved for NPC Base FormID {:08X}. Clearing cached assignment.", data->addonName, a_baseID);
 			Storage::ClearNPCData(a_baseID);
 			return nullptr;
 		}
@@ -218,9 +216,9 @@ namespace SchlongLogic {
 
 		for (const auto& candidate : candidates) {
 			auto* armor = ResolveAddonArmor(candidate.name);
-			if (!IsRealGenitalAddon(armor)) {
+			if (!IsResolvableAddonArmor(armor)) {
 				SKSE::log::warn(
-					"SOS: skipping enabled addon '{}' for actor '{}' because its genital armor is missing/invalid",
+					"SOS: skipping enabled addon '{}' for actor '{}' because its addon armor cannot be resolved",
 					candidate.name,
 					a_actor->GetName());
 				continue;
