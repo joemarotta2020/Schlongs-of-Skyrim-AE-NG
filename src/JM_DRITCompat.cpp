@@ -190,25 +190,55 @@ namespace {
 		auto* wornSlot52 = a_actor->GetWornArmor(slot);
 		const bool wornExpected = wornSlot52 == a_schlong;
 		const bool loaded3D = a_actor->Is3DLoaded();
-		bool refreshQueued = false;
+		bool modelUpdateIssued = false;
 
-		// EquipObject can update inventory/equipment state before the corpse's existing
-		// NiNode has attached the ArmorAddon. Force one corpse-only 3D reset so the
-		// rendered state catches up with the authoritative SOS assignment.
+		// Immediate/non-queued native equipment changes need the actor process model
+		// refresh used by Skyrim's own equipment flow. DoReset3D is a full asynchronous
+		// skeleton rebuild and can leave the corpse logically worn while replacing the
+		// skeleton that SOS just updated.
 		if (loaded3D) {
-			a_actor->DoReset3D(false);
-			refreshQueued = true;
+			auto* process = a_actor->GetActorRuntimeData().currentProcess;
+			if (process) {
+				process->Update3DModel(a_actor);
+				modelUpdateIssued = true;
+			}
 		}
 
+		const RE::FormID actorID = a_actor->GetFormID();
+		const RE::FormID addonID = a_schlong->GetFormID();
+
+		// Let Update3DModel finish attaching the ArmorAddon before SOS scales genital
+		// bones. ScaleSchlongBones itself queues its node work, giving the refreshed
+		// skeleton another task boundary before node access.
+		SKSE::GetTaskInterface()->AddTask([actorID, addonID]() {
+			auto* actor = RE::TESForm::LookupByID<RE::Actor>(actorID);
+			auto* addon = RE::TESForm::LookupByID<RE::TESObjectARMO>(addonID);
+			if (!actor || !addon || !actor->Is3DLoaded())
+				return;
+
+			const auto settleSlot = RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary;
+			const bool stillWorn = actor->GetWornArmor(settleSlot) == addon;
+			SchlongLogic::ScaleSchlongBones(actor);
+
+			SKSE::log::info(
+				"JM DRIT: corpse visual settle actor='{}' ({:08X}) addon='{}' ({:08X}) worn={} 3D={}",
+				actor->GetName(),
+				actor->GetFormID(),
+				addon->GetName(),
+				addon->GetFormID(),
+				stillWorn,
+				actor->Is3DLoaded());
+		});
+
 		SKSE::log::info(
-			"JM DRIT: corpse enforce actor='{}' ({:08X}) addon='{}' ({:08X}) worn={} 3D={} reset3D={}",
+			"JM DRIT: corpse enforce actor='{}' ({:08X}) addon='{}' ({:08X}) worn={} 3D={} modelUpdate={}",
 			a_actor->GetName(),
 			a_actor->GetFormID(),
 			a_schlong->GetName(),
 			a_schlong->GetFormID(),
 			wornExpected,
 			loaded3D,
-			refreshQueued);
+			modelUpdateIssued);
 	}
 
 	void ApplySOSFactions(RE::Actor* a_actor, RE::TESNPC* a_base)
@@ -338,7 +368,8 @@ namespace {
 				a_actor->GetFormID());
 		}
 
-		SchlongLogic::ScaleSchlongBones(a_actor);
+		if (!isCorpse)
+			SchlongLogic::ScaleSchlongBones(a_actor);
 		return true;
 	}
 
