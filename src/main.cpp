@@ -59,6 +59,11 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
 
 			Storage::LoadAddonBoneData();
 
+			// Resolve dependencies before actor/equipment events can fire, then protect
+			// real SOS genital armors from SexLab's strip pass.
+			Util::CheckDependencies();
+			Util::ProtectSOSGenitalsFromSexLab();
+
 			//Events
 			SOS::RegisterActivationEvents();
 			SOS::RegisterEquipEvent();
@@ -71,8 +76,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
 			SKSE::GetPapyrusInterface()->Register(Actors::RegisterFunctions);
 			SKSE::GetPapyrusInterface()->Register(JMDRITCompat::RegisterFunctions);
 
-			//Check dependencie
-			Util::CheckDependencies();
 		}
 	});
 

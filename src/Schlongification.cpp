@@ -5,6 +5,13 @@ namespace SOS {
 
 	inline std::unordered_set<RE::FormID> g_activeActors;
 
+	struct StabilizationState {
+		std::uint16_t framesRemaining{ 120 };
+		std::uint8_t framesUntilAttempt{ 0 };
+	};
+
+	inline std::unordered_map<RE::FormID, StabilizationState> g_stabilizingActors;
+
 	static bool IsRealGenitalAddon(RE::TESObjectARMO* a_armor) {
 		return a_armor && Util::ArmorHasKeyword(a_armor, GenKW) && !Util::ArmorHasKeyword(a_armor, PubKW);
 	}
@@ -86,7 +93,7 @@ namespace SOS {
 				refID,
 				a_reason ? a_reason : "unknown");
 		}
-		else {
+		else if (!a_reason || std::string_view(a_reason) != "deferred-slot52-stabilization") {
 			SKSE::log::warn(
 				"SOS: genital restore did not stick for actor '{}' ({:08X}) reason={}",
 				a_actor->GetName(),
@@ -97,28 +104,86 @@ namespace SOS {
 		return visible;
 	}
 
-	static void QueueVisibilityStabilization(RE::FormID a_refID, std::uint8_t a_passesRemaining) {
-		if (a_refID == 0 || a_passesRemaining == 0)
+	static void RunVisibilityStabilization(RE::FormID a_refID) {
+		auto stateIt = g_stabilizingActors.find(a_refID);
+		if (stateIt == g_stabilizingActors.end())
 			return;
+
+		auto* actor = RE::TESForm::LookupByID<RE::Actor>(a_refID);
+		if (!actor || !actor->Is3DLoaded()) {
+			g_stabilizingActors.erase(a_refID);
+			return;
+		}
+
+		if (actor->IsDead()) {
+			JMDRITCompat::EnsureCorpseSchlong(actor, true);
+			g_stabilizingActors.erase(a_refID);
+			return;
+		}
+
+		auto& state = stateIt->second;
+		bool visible = false;
+		if (state.framesUntilAttempt == 0) {
+			visible = EquipAssignedAddonIfExposed(actor, "deferred-slot52-stabilization");
+			state.framesUntilAttempt = 5;
+		}
+		else {
+			--state.framesUntilAttempt;
+		}
+
+		if (visible) {
+			SKSE::log::info(
+				"SOS: Slot52 stabilization succeeded for actor '{}' ({:08X})",
+				actor->GetName(),
+				a_refID);
+			g_stabilizingActors.erase(a_refID);
+			return;
+		}
+
+		if (state.framesRemaining > 0)
+			--state.framesRemaining;
+
+		if (state.framesRemaining == 0) {
+			SKSE::log::warn(
+				"SOS: Slot52 stabilization expired without a visible genital addon for actor '{}' ({:08X})",
+				actor->GetName(),
+				a_refID);
+			g_stabilizingActors.erase(a_refID);
+			return;
+		}
 
 		auto* taskInterface = SKSE::GetTaskInterface();
-		if (!taskInterface)
+		if (!taskInterface) {
+			g_stabilizingActors.erase(a_refID);
+			return;
+		}
+
+		taskInterface->AddTask([a_refID]() {
+			RunVisibilityStabilization(a_refID);
+		});
+	}
+
+	static void QueueVisibilityStabilization(RE::FormID a_refID) {
+		if (a_refID == 0)
 			return;
 
-		taskInterface->AddTask([a_refID, a_passesRemaining]() {
-			auto* actor = RE::TESForm::LookupByID<RE::Actor>(a_refID);
-			if (!actor)
-				return;
+		auto existing = g_stabilizingActors.find(a_refID);
+		if (existing != g_stabilizingActors.end()) {
+			existing->second.framesRemaining = 120;
+			existing->second.framesUntilAttempt = 0;
+			return;
+		}
 
-			if (actor->IsDead()) {
-				JMDRITCompat::EnsureCorpseSchlong(actor, true);
-				return;
-			}
+		g_stabilizingActors.emplace(a_refID, StabilizationState{});
 
-			EquipAssignedAddonIfExposed(actor, "deferred-slot52-stabilization");
+		auto* taskInterface = SKSE::GetTaskInterface();
+		if (!taskInterface) {
+			g_stabilizingActors.erase(a_refID);
+			return;
+		}
 
-			if (a_passesRemaining > 1)
-				QueueVisibilityStabilization(a_refID, static_cast<std::uint8_t>(a_passesRemaining - 1));
+		taskInterface->AddTask([a_refID]() {
+			RunVisibilityStabilization(a_refID);
 		});
 	}
 
@@ -168,7 +233,7 @@ namespace SOS {
 		// Underwear removed: defer restoration until the external equipment operation
 		// has fully settled.  This prevents SexLab/other strip loops from immediately
 		// stripping the addon we just restored.
-		QueueVisibilityStabilization(a_actor->GetFormID(), 8);
+		QueueVisibilityStabilization(a_actor->GetFormID());
 	}
 
 	static void OnWearChange(RE::Actor* a_actor, const RE::TESEquipEvent* a_event, bool is_equipping) {
@@ -219,7 +284,7 @@ namespace SOS {
 		// This includes the genital addon itself: SexLab may strip it directly.  Never
 		// try to win that race synchronously inside the unequip event.  Reassert the
 		// authoritative assignment over the next few main-thread frames instead.
-		QueueVisibilityStabilization(a_actor->GetFormID(), 8);
+		QueueVisibilityStabilization(a_actor->GetFormID());
 	}
 
 	RE::BSEventNotifyControl ObjectLoadedHandler::ProcessEvent(const RE::TESObjectLoadedEvent* a_event, RE::BSTEventSource<RE::TESObjectLoadedEvent>*) {

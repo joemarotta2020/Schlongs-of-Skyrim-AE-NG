@@ -69,6 +69,40 @@ namespace Util {
 		}
 	}
 
+	void ProtectSOSGenitalsFromSexLab() {
+
+		auto* dataHandler = RE::TESDataHandler::GetSingleton();
+		if (!dataHandler)
+			return;
+
+		auto* noStrip = dataHandler->LookupForm<RE::BGSKeyword>(0x02F16E, "SexLab.esm");
+		if (!noStrip) {
+			SKSE::log::warn("SOS: SexLabNoStrip keyword was not found; genital strip protection is unavailable.");
+			return;
+		}
+
+		std::uint32_t protectedCount = 0;
+		std::uint32_t alreadyProtected = 0;
+
+		for (auto* armor : dataHandler->GetFormArray<RE::TESObjectARMO>()) {
+			if (!armor || !ArmorHasKeyword(armor, GenKW) || ArmorHasKeyword(armor, PubKW))
+				continue;
+
+			if (armor->HasKeyword(noStrip)) {
+				++alreadyProtected;
+				continue;
+			}
+
+			armor->AddKeyword(noStrip);
+			++protectedCount;
+		}
+
+		SKSE::log::info(
+			"SOS: SexLabNoStrip protection active for real genital addons: added={}, already-protected={}",
+			protectedCount,
+			alreadyProtected);
+	}
+
 
 	std::unordered_set<RE::BSFixedString> LoadValidatedModList(const RE::BSFixedString& a_filePath, const RE::BSFixedString& a_listName) {
 

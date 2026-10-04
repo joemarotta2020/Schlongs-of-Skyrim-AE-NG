@@ -95,6 +95,8 @@ namespace Util {
 
 	void CheckDependencies();
 
+	void ProtectSOSGenitalsFromSexLab();
+
 	void ReadJSONDefaultsFromINI();
 
 	std::unordered_set<RE::BSFixedString> LoadValidatedModList(const RE::BSFixedString& a_filePath, const RE::BSFixedString& a_listName);
