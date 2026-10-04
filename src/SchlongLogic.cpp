@@ -135,7 +135,7 @@ namespace SchlongLogic {
 	RE::TESObjectARMO* ResolveCachedAddon(RE::FormID a_baseID) {
 
 		auto* data = Storage::GetNPCData(a_baseID);
-		if (!data || data->addonName.empty())
+		if (!data || Storage::IsNoneAddonName(data->addonName))
 			return nullptr;
 
 		auto* armor = ResolveAddonArmor(data->addonName);
@@ -169,12 +169,12 @@ namespace SchlongLogic {
 		if (Storage::HasNPCData(baseID)) {
 			auto* cached = Storage::GetNPCData(baseID);
 
-			if (cached && cached->addonName.empty()) {
+			if (cached && Storage::IsNoneAddonName(cached->addonName)) {
 				if (npcBase->HasKeywordString(NPCKW) || Storage::HasExplicitNoneOverride(baseID))
 					return nullptr;
 
 				SKSE::log::info(
-					"SOS: migrating stale cached NONE for actor '{}' base {:08X}; rerolling from current compatible addons",
+					"SOS: migrating stale cached NONE-like assignment for actor '{}' base {:08X}; rerolling from current compatible addons",
 					a_actor->GetName(),
 					baseID);
 				Storage::ClearNPCData(baseID);
