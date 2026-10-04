@@ -290,6 +290,7 @@ namespace Storage {
 	//===============================================================NPCs===============================================================
 
 	std::unordered_map<RE::FormID, NPCData> s_npcData;
+	std::unordered_set<RE::FormID> s_explicitNoneOverrides;
 
 	const AddonMap& GetAddons() {
 
@@ -325,6 +326,24 @@ namespace Storage {
 	void ClearNPCData(RE::FormID a_baseID) {
 
 		s_npcData.erase(a_baseID);
+	}
+
+	bool HasExplicitNoneOverride(RE::FormID a_baseID) {
+
+		return s_explicitNoneOverrides.contains(a_baseID);
+	}
+
+	void SetExplicitNoneOverride(RE::FormID a_baseID, bool a_explicitNone) {
+
+		if (a_explicitNone)
+			s_explicitNoneOverrides.insert(a_baseID);
+		else
+			s_explicitNoneOverrides.erase(a_baseID);
+	}
+
+	void ClearExplicitNoneOverrides() {
+
+		s_explicitNoneOverrides.clear();
 	}
 
 	std::uint8_t GetNPCRank(RE::FormID a_baseID) {
@@ -420,13 +439,19 @@ namespace Storage {
 			}
 		}
 
-		SKSE::log::info("LoadCallback: restored {} NPC entries from cosave", s_npcData.size());
+		// MCM/JSON NPC overrides are authoritative over historical cosave state.
+		// Reapply them after deserialization so an explicit manual NONE stays NONE,
+		// while a manual non-NONE override cannot be replaced by stale cached data.
+		Actors::ApplyNPCOverrides();
+
+		SKSE::log::info("LoadCallback: restored {} NPC entries from cosave; explicit overrides reapplied", s_npcData.size());
 	}
 
 	void RevertCallback(SKSE::SerializationInterface*) {
 
 		SKSE::log::info("Reverting Storage: clearing {} entries", s_npcData.size());
 		s_npcData.clear();
+		s_explicitNoneOverrides.clear();
 		Actors::ApplyNPCOverrides();
 	}
 
