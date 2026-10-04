@@ -227,18 +227,23 @@ namespace {
 		}
 	}
 
-	bool EnsureCorpseSchlongImpl(RE::Actor* a_actor, bool a_forceNonNone)
+	bool EnsureActorSchlongImpl(RE::Actor* a_actor, bool a_forceNonNone)
 	{
-		if (!a_actor || !a_actor->IsDead())
+		if (!a_actor)
 			return false;
+
+		const bool isCorpse = a_actor->IsDead();
 
 		auto* base = a_actor->GetActorBase();
 		if (!base)
 			return false;
 
-		// First eliminate the late-underwear path completely. This is intentionally
-		// corpse-only and never changes living-NPC underwear behavior.
-		StripCorpseUnderwear(a_actor);
+		// Corpses use the hard DRIT invariant: SOS underwear is removed entirely.
+		// Living actors keep ordinary underwear behavior; we only establish a real
+		// genital assignment so the existing SOS equip event can reveal it when
+		// SexLab strips the blocking garment.
+		if (isCorpse)
+			StripCorpseUnderwear(a_actor);
 
 		// Preserve SOS's existing assignment/draw when it succeeds. If the actor died
 		// before activation or a female legitimately rolled NONE, force a real,
@@ -257,15 +262,19 @@ namespace {
 
 		ApplySOSFactions(a_actor, base);
 
-		// Respect legitimate surviving armor that occupies Slot 52. Its unequip event
-		// will restore the already-cached addon later. DRIT should not silently strip
-		// intact armor just to force visual exposure.
+		// Respect legitimate blocking armor/underwear. For living actors this is
+		// important: SSS commits while the NPC may still be clothed. We establish
+		// the non-NONE assignment now and let SOS's existing equip event reveal it
+		// the instant SexLab strips the blocker.
 		auto* slot52Armor = a_actor->GetWornArmor(RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary);
-		if (slot52Armor && !Util::ArmorHasKeyword(slot52Armor, GenKW)) {
-			SKSE::log::debug(
-				"JM DRIT: addon assignment ensured for '{}', but surviving Slot 52 armor '{}' remains equipped",
+		const bool underwearEquipped = Util::ActorHasEquippedArmorWithKeyword(a_actor, UndwKW);
+		if ((slot52Armor && !Util::ArmorHasKeyword(slot52Armor, GenKW)) || (!isCorpse && underwearEquipped)) {
+			SKSE::log::info(
+				"JM SOS: genital assignment ensured for actor '{}' ({:08X}); waiting for blocker removal (slot52='{}', underwear={})",
 				a_actor->GetName(),
-				slot52Armor->GetName());
+				a_actor->GetFormID(),
+				slot52Armor ? slot52Armor->GetName() : "",
+				underwearEquipped);
 			SchlongLogic::ScaleSchlongBones(a_actor);
 			return true;
 		}
@@ -289,21 +298,44 @@ namespace {
 			true,   // immediate
 			true);  // applyNow
 
-		RefreshCorpse3D(a_actor, schlong);
+		if (isCorpse)
+			RefreshCorpse3D(a_actor, schlong);
+		else
+			SKSE::log::info(
+				"JM SOS: forced visible genital addon '{}' ({:08X}) for living actor '{}' ({:08X})",
+				schlong->GetName(),
+				schlong->GetFormID(),
+				a_actor->GetName(),
+				a_actor->GetFormID());
+
 		SchlongLogic::ScaleSchlongBones(a_actor);
 		return true;
 	}
 
+	bool EnsureActorSchlongPapyrus(RE::StaticFunctionTag*, RE::Actor* a_actor, bool a_forceNonNone)
+	{
+		return EnsureActorSchlongImpl(a_actor, a_forceNonNone);
+	}
+
 	bool EnsureCorpseSchlongPapyrus(RE::StaticFunctionTag*, RE::Actor* a_actor, bool a_forceNonNone)
 	{
-		return EnsureCorpseSchlongImpl(a_actor, a_forceNonNone);
+		if (!a_actor || !a_actor->IsDead())
+			return false;
+		return EnsureActorSchlongImpl(a_actor, a_forceNonNone);
 	}
 }
 
 namespace JMDRITCompat {
+	bool EnsureActorSchlong(RE::Actor* a_actor, bool a_forceNonNone)
+	{
+		return EnsureActorSchlongImpl(a_actor, a_forceNonNone);
+	}
+
 	bool EnsureCorpseSchlong(RE::Actor* a_actor, bool a_forceNonNone)
 	{
-		return EnsureCorpseSchlongImpl(a_actor, a_forceNonNone);
+		if (!a_actor || !a_actor->IsDead())
+			return false;
+		return EnsureActorSchlongImpl(a_actor, a_forceNonNone);
 	}
 
 	bool RegisterFunctions(RE::BSScript::IVirtualMachine* a_vm)
@@ -311,6 +343,7 @@ namespace JMDRITCompat {
 		if (!a_vm)
 			return false;
 
+		a_vm->RegisterFunction("EnsureActorSchlong", kPapyrusScript, EnsureActorSchlongPapyrus);
 		a_vm->RegisterFunction("EnsureCorpseSchlong", kPapyrusScript, EnsureCorpseSchlongPapyrus);
 		return true;
 	}
