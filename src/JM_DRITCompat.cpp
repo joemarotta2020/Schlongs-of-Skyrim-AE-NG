@@ -287,26 +287,56 @@ namespace {
 		// addon and force the immediate native equip path used by SOS AE-NG itself.
 		Util::RemoveSOSItemsFromInventory(a_actor);
 		a_actor->AddObjectToContainer(schlong, nullptr, 1, nullptr);
-		equipManager->EquipObject(
-			a_actor,
-			schlong,
-			nullptr,
-			1,
-			nullptr,
-			true,   // preventUnequip
-			false,  // playSound
-			true,   // immediate
-			true);  // applyNow
+		if (isCorpse) {
+			// CommonLibSSE-NG ActorEquipManager::EquipObject parameters are:
+			// queueEquip, forceEquip, playSounds, applyNow.
+			// Corpses do not reliably process the queued/non-forced path used by living
+			// actors, so bypass the queue and explicitly force the equipment state.
+			equipManager->EquipObject(
+				a_actor,
+				schlong,
+				nullptr,
+				1,
+				nullptr,
+				false,  // queueEquip
+				true,   // forceEquip
+				false,  // playSounds
+				true);  // applyNow
 
-		if (isCorpse)
+			const auto slot = RE::BIPED_MODEL::BipedObjectSlot::kModPelvisSecondary;
+			const bool wornExpected = a_actor->GetWornArmor(slot) == schlong;
 			RefreshCorpse3D(a_actor, schlong);
-		else
+
+			if (!wornExpected) {
+				SKSE::log::warn(
+					"JM DRIT: forced corpse equip still did not stick for actor '{}' ({:08X}) addon='{}' ({:08X})",
+					a_actor->GetName(),
+					a_actor->GetFormID(),
+					schlong->GetName(),
+					schlong->GetFormID());
+				return false;
+			}
+		}
+		else {
+			// Preserve the currently working live-actor behavior exactly.
+			equipManager->EquipObject(
+				a_actor,
+				schlong,
+				nullptr,
+				1,
+				nullptr,
+				true,   // queueEquip
+				false,  // forceEquip
+				true,   // playSounds
+				true);  // applyNow
+
 			SKSE::log::info(
 				"JM SOS: forced visible genital addon '{}' ({:08X}) for living actor '{}' ({:08X})",
 				schlong->GetName(),
 				schlong->GetFormID(),
 				a_actor->GetName(),
 				a_actor->GetFormID());
+		}
 
 		SchlongLogic::ScaleSchlongBones(a_actor);
 		return true;
