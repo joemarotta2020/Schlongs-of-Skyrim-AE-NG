@@ -66,6 +66,7 @@ namespace Storage {
 	};
 
 	extern std::unordered_map<RE::FormID, NPCData> s_npcData;
+	extern std::unordered_set<RE::FormID> s_explicitNoneOverrides;
 
 	bool HasNPCData(RE::FormID a_baseID);
 	void SetNPCAddonData(RE::FormID a_baseID, const RE::BSFixedString& a_addonName, std::uint8_t a_rank);
@@ -75,6 +76,9 @@ namespace Storage {
 	const AddonMap& GetAddons();
 	const GenderGroups& GetGenderGroups();
 	void ClearNPCData(RE::FormID a_baseID);
+	bool HasExplicitNoneOverride(RE::FormID a_baseID);
+	void SetExplicitNoneOverride(RE::FormID a_baseID, bool a_explicitNone);
+	void ClearExplicitNoneOverrides();
 	void LoadAddonBoneData();
 	bool EnsureAddonDataLoaded();
 
