@@ -1,4 +1,5 @@
 #include "SchlongLogic.h"
+#include "JM_AddonGenderValidation.h"
 
 //Scale bones
 static void SetNodeScaleImpl(RE::NiAVObject* a_root, const char* a_nodeName, float a_scale) {
@@ -160,12 +161,13 @@ namespace SchlongLogic {
 
 		const RE::FormID baseID = npcBase->GetFormID();
 		bool migratedStaleNone = false;
+		bool repairedCrossGender = false;
 
-		// A cached non-NONE assignment is authoritative if its addon still resolves.
-		// Historically, SOS also serialized random NONE as an empty addon name.  That
-		// made old NONE results permanent even after probabilities/configuration were
-		// changed.  Preserve only deliberate NONE states: the SOS_NoneDefault keyword
-		// or an explicit per-NPC MCM/JSON NONE override.
+		// A cached non-NONE assignment is authoritative if its addon still resolves and
+		// still belongs to the actor's current SOS gender group. Manual MCM/JSON overrides
+		// remain authoritative even when they intentionally cross that gender boundary.
+		// Historically, SOS also serialized random NONE as an empty addon name. That made
+		// old NONE results permanent even after probabilities/configuration were changed.
 		if (Storage::HasNPCData(baseID)) {
 			auto* cached = Storage::GetNPCData(baseID);
 
@@ -180,11 +182,20 @@ namespace SchlongLogic {
 				Storage::ClearNPCData(baseID);
 				migratedStaleNone = true;
 			}
+			else if (cached && JMAddonGenderValidation::ShouldReplaceCachedAddon(npcBase, cached->addonName)) {
+				SKSE::log::warn(
+					"SOS: rejecting cached cross-gender addon '{}' for actor '{}' base {:08X}; rerolling from current gender group",
+					cached->addonName,
+					a_actor->GetName(),
+					baseID);
+				Storage::ClearNPCData(baseID);
+				repairedCrossGender = true;
+			}
 			else {
 				if (auto* cachedArmor = ResolveCachedAddon(baseID))
 					return cachedArmor;
 
-				// ResolveCachedAddon clears missing/invalid cached addon data.  Fall through
+				// ResolveCachedAddon clears missing/invalid cached addon data. Fall through
 				// and rebuild the assignment from the current configuration immediately.
 				SKSE::log::info(
 					"SOS: rebuilding invalid cached addon for actor '{}' base {:08X}",
@@ -239,8 +250,8 @@ namespace SchlongLogic {
 		std::size_t selectedIndex = 0;
 
 		// NON-NONE invariant: once at least one enabled, race-compatible genital addon
-		// exists, Chance values are weights between those addons.  NONE is not part of
-		// the random draw.  This makes 100+100 exactly 50/50 and also prevents an
+		// exists, Chance values are weights between those addons. NONE is not part of
+		// the random draw. This makes 100+100 exactly 50/50 and also prevents an
 		// accidental NONE gap when enabled weights total less than 100.
 		if (totalWeight > 0) {
 			std::uniform_int_distribution<std::uint32_t> dist(1, totalWeight);
@@ -269,6 +280,14 @@ namespace SchlongLogic {
 		if (migratedStaleNone) {
 			SKSE::log::info(
 				"SOS: stale NONE repaired for actor '{}' base {:08X} -> addon '{}'",
+				a_actor->GetName(),
+				baseID,
+				selected.candidate.name);
+		}
+
+		if (repairedCrossGender) {
+			SKSE::log::info(
+				"SOS: corrected cross-gender assignment for actor '{}' base {:08X} -> addon '{}'",
 				a_actor->GetName(),
 				baseID,
 				selected.candidate.name);
